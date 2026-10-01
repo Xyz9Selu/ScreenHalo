@@ -69,8 +69,9 @@ To build it yourself:
 
    The result is `dist\ScreenHalo.exe` (ignored by git); the script also prints its SHA256.
 
-The product name, description and version in the exe's properties come from the `;@Ahk2Exe-...`
-directives at the top of `ScreenHalo.ahk`. When releasing, bump `VERSION` and `;@Ahk2Exe-SetVersion`
+The product name, description, version and icon of the exe come from the `;@Ahk2Exe-...`
+directives at the top of `ScreenHalo.ahk`. The icon is `assets/ScreenHalo.ico` (multi-size, drawn by
+`tools/make-icon.ps1`, so it can be regenerated or restyled); running the `.ahk` uses the same icon in the tray. When releasing, bump `VERSION` and `;@Ahk2Exe-SetVersion`
 together, build, tag (`vX.Y.Z`), and attach the exe and its SHA256 to the GitHub release.
 
 ## Configuration

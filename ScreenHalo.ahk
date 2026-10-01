@@ -5,6 +5,7 @@ Persistent
 ;@Ahk2Exe-SetName ScreenHalo
 ;@Ahk2Exe-SetDescription ScreenHalo - multi-monitor focus indicator
 ;@Ahk2Exe-SetVersion 0.1.1
+;@Ahk2Exe-SetMainIcon assets\ScreenHalo.ico
 ;@Ahk2Exe-SetCopyright MIT License
 VERSION := "0.1.1"        ; keep in sync with ;@Ahk2Exe-SetVersion above
 
@@ -285,6 +286,8 @@ InstallForegroundHook()
 OnMessage(WM_DISPLAYCHANGE, OnDisplayChange)
 OnMessage(WM_DPICHANGED, (*) => 0)   ; we size overlays ourselves; suppress the auto-resize
 OnExit(Cleanup)
+if (!A_IsCompiled && FileExist(A_ScriptDir "\assets\ScreenHalo.ico"))
+    TraySetIcon(A_ScriptDir "\assets\ScreenHalo.ico")   ; the compiled exe uses its own embedded icon
 BuildTrayMenu()
 RebuildOverlays()
 return
