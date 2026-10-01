@@ -6,8 +6,8 @@
 # Each monitor is captured separately and scaled to the same 16:9 size, then placed side by
 # side, so the pictures show two equal screens regardless of your real layout.
 # While it runs, every monitor is covered by the demo windows for ~6 s per scene.
-# It uses its own temporary config (FOCUSSCREEN_INI), so your FocusScreen.ini is untouched,
-# and restarts your normal FocusScreen at the end.
+# It uses its own temporary config (SCREENHALO_INI), so your ScreenHalo.ini is untouched,
+# and restarts your normal ScreenHalo at the end.
 param([string]$OutDir = (Join-Path $PSScriptRoot '..\docs\img'))
 $ErrorActionPreference = 'Stop'
 
@@ -28,7 +28,7 @@ public class Cap { [DllImport("user32.dll")] public static extern bool SetProces
 [Cap]::SetProcessDpiAwarenessContext([IntPtr](-4)) | Out-Null
 
 function New-Ini($style, $otherEdges = 'TBLR', $otherColor = '8A8A8A') {
-    $f = Join-Path $env:TEMP 'focusscreen-demo.ini'
+    $f = Join-Path $env:TEMP 'screenhalo-demo.ini'
     @"
 [focus]
 style=$style
@@ -52,10 +52,10 @@ enabled=1
 # Captures all monitors, then returns one picture with each monitor scaled to $tileW x ($tileW*9/16),
 # left to right, flush with a thin gap.
 function Capture-Pair($style, $focusIdx, $tileW, $otherEdges = 'TBLR', $otherColor = '8A8A8A') {
-    $env:FOCUSSCREEN_INI = New-Ini $style $otherEdges $otherColor
+    $env:SCREENHALO_INI = New-Ini $style $otherEdges $otherColor
     $demo = Start-Process $ahk "`"$PSScriptRoot\demo.ahk`" $focusIdx 15" -PassThru
     Start-Sleep 2
-    $fs = Start-Process $ahk "`"$root\FocusScreen.ahk`"" -PassThru
+    $fs = Start-Process $ahk "`"$root\ScreenHalo.ahk`"" -PassThru
     Start-Sleep 2.5                      # let any pulse finish
     $x = [Cap]::GetSystemMetrics(76); $y = [Cap]::GetSystemMetrics(77)
     $w = [Cap]::GetSystemMetrics(78); $h = [Cap]::GetSystemMetrics(79)
@@ -115,7 +115,7 @@ try {
 }
 finally {
     Stop-Process -Name AutoHotkey64 -Force -ErrorAction SilentlyContinue
-    Remove-Item Env:FOCUSSCREEN_INI -ErrorAction SilentlyContinue
-    if ($userRunning) { Start-Process $ahk "`"$root\FocusScreen.ahk`"" }
+    Remove-Item Env:SCREENHALO_INI -ErrorAction SilentlyContinue
+    if ($userRunning) { Start-Process $ahk "`"$root\ScreenHalo.ahk`"" }
 }
 Write-Host "Saved to $OutDir"

@@ -50,7 +50,7 @@ Rect(g, x, y, w, h, color) {
 }
 
 BuildWindow(i, m) {
-    g := Gui("-Caption -DPIScale +AlwaysOnTop +ToolWindow", "FocusScreenDemo" i)   ; raw pixels
+    g := Gui("-Caption -DPIScale +AlwaysOnTop +ToolWindow", "ScreenHaloDemo" i)   ; raw pixels
     s := m.scale
     if (Mod(i, 2) = 1)
         BuildAgentTerminal(g, m, s)

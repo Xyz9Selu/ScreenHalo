@@ -2,22 +2,24 @@
 #SingleInstance Force
 Persistent
 
-;@Ahk2Exe-SetName FocusScreen
-;@Ahk2Exe-SetDescription FocusScreen - multi-monitor focus indicator
-;@Ahk2Exe-SetVersion 0.1.0
+;@Ahk2Exe-SetName ScreenHalo
+;@Ahk2Exe-SetDescription ScreenHalo - multi-monitor focus indicator
+;@Ahk2Exe-SetVersion 0.1.1
 ;@Ahk2Exe-SetCopyright MIT License
-VERSION := "0.1.0"        ; keep in sync with ;@Ahk2Exe-SetVersion above
+VERSION := "0.1.1"        ; keep in sync with ;@Ahk2Exe-SetVersion above
 
-; FocusScreen - marks the monitor that owns the foreground window with a thin
+; ScreenHalo - marks the monitor that owns the foreground window with a thin
 ; edge indicator, and optionally marks the other monitors with a subtler one.
 ; One click-through overlay per monitor, event driven (no polling).
-; Settings are changed from the tray menu and stored in FocusScreen.ini.
+; Settings are changed from the tray menu and stored in ScreenHalo.ini.
 
 ; ---------------------------------------------------------------- Config
-DEBUG := false            ; true = log to FocusScreen.log + OutputDebug
-IniFile := EnvGet("FOCUSSCREEN_INI") || A_ScriptDir "\FocusScreen.ini"   ; env override: tools/capture-screenshots.ps1
+DEBUG := false            ; true = log to ScreenHalo.log + OutputDebug
+IniFile := EnvGet("SCREENHALO_INI") || A_ScriptDir "\ScreenHalo.ini"   ; env override: tools/capture-screenshots.ps1
+if (!EnvGet("SCREENHALO_INI") && !FileExist(IniFile) && FileExist(A_ScriptDir "\FocusScreen.ini"))
+    try FileCopy(A_ScriptDir "\FocusScreen.ini", IniFile)   ; settings from before the rename
 
-; Defaults; overridden by FocusScreen.ini.  style: off | border | top
+; Defaults; overridden by ScreenHalo.ini.  style: off | border | top
 ; The focused screen is the work screen: keep it calm (the pulse on focus change does
 ; the attention-grabbing). The other screens are auxiliary: make them easier to notice.
 Defaults := Map(
@@ -100,7 +102,7 @@ class Overlay {
         this.mode := "attr"      ; "attr" | "pixel"
         this.dc := 0, this.bmp := 0, this.oldBmp := 0, this.bits := 0
         this.x := 0, this.y := 0, this.w := 0, this.h := 0
-        g := Gui("+AlwaysOnTop -Caption +ToolWindow +E" WS_EX_NOACTIVATE " +E" WS_EX_TRANSPARENT, "FocusScreenOverlay")
+        g := Gui("+AlwaysOnTop -Caption +ToolWindow +E" WS_EX_NOACTIVATE " +E" WS_EX_TRANSPARENT, "ScreenHaloOverlay")
         g.Show("NoActivate Hide w100 h100")
         this.gui := g
         this.hwnd := g.Hwnd
@@ -633,13 +635,13 @@ ToggleEnabled(*) {
 }
 
 ToggleStartup(*) {
-    lnk := A_Startup "\FocusScreen.lnk"
+    lnk := A_Startup "\ScreenHalo.lnk"
     if FileExist(lnk)
         FileDelete(lnk)
     else if A_IsCompiled                 ; the exe is its own interpreter
-        FileCreateShortcut(A_ScriptFullPath, lnk, A_ScriptDir, , "FocusScreen")
+        FileCreateShortcut(A_ScriptFullPath, lnk, A_ScriptDir, , "ScreenHalo")
     else
-        FileCreateShortcut(A_AhkPath, lnk, A_ScriptDir, '"' A_ScriptFullPath '"', "FocusScreen")
+        FileCreateShortcut(A_AhkPath, lnk, A_ScriptDir, '"' A_ScriptFullPath '"', "ScreenHalo")
     BuildTrayMenu()
 }
 
@@ -647,7 +649,7 @@ ToggleStartup(*) {
 BuildTrayMenu() {
     tray := A_TrayMenu
     tray.Delete()
-    A_IconTip := "FocusScreen " VERSION
+    A_IconTip := "ScreenHalo " VERSION
     tray.Add("Enabled", ToggleEnabled)
     if State.enabled
         tray.Check("Enabled")
@@ -660,7 +662,7 @@ BuildTrayMenu() {
     tray.Add("Other screens", BuildRoleMenu("other"))
     tray.Add()
     tray.Add("Start with Windows", ToggleStartup)
-    if FileExist(A_Startup "\FocusScreen.lnk")
+    if FileExist(A_Startup "\ScreenHalo.lnk")
         tray.Check("Start with Windows")
     tray.Add("Reload", (*) => Reload())
     tray.Add("Exit", (*) => ExitApp())
@@ -743,7 +745,7 @@ Cleanup(*) {
 Log(msg) {
     if !DEBUG
         return
-    line := FormatTime(, "HH:mm:ss") " [FocusScreen] " msg
+    line := FormatTime(, "HH:mm:ss") " [ScreenHalo] " msg
     OutputDebug(line)
-    try FileAppend(line "`n", A_ScriptDir "\FocusScreen.log")
+    try FileAppend(line "`n", A_ScriptDir "\ScreenHalo.log")
 }
