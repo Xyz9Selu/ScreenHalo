@@ -3,6 +3,8 @@
 #
 #   powershell -ExecutionPolicy Bypass -File tools\capture-screenshots.ps1 [-OutDir docs\img]
 #
+# Each monitor is captured separately and scaled to the same 16:9 size, then placed side by
+# side, so the pictures show two equal screens regardless of your real layout.
 # While it runs, every monitor is covered by the demo windows for ~6 s per scene.
 # It uses its own temporary config (FOCUSSCREEN_INI), so your FocusScreen.ini is untouched,
 # and restarts your normal FocusScreen at the end.
@@ -17,6 +19,7 @@ New-Item -ItemType Directory -Force $OutDir | Out-Null
 $OutDir = (Resolve-Path $OutDir).Path
 
 Add-Type -AssemblyName System.Drawing
+Add-Type -AssemblyName System.Windows.Forms
 Add-Type @'
 using System.Runtime.InteropServices;
 public class Cap { [DllImport("user32.dll")] public static extern bool SetProcessDpiAwarenessContext(System.IntPtr c);
@@ -46,7 +49,9 @@ enabled=1
     return $f
 }
 
-function Capture-Scene($file, $style, $focusIdx, $otherEdges = 'TBLR', $otherColor = '8A8A8A') {
+# Captures all monitors, then returns one picture with each monitor scaled to $tileW x ($tileW*9/16),
+# left to right, flush with a thin gap.
+function Capture-Pair($style, $focusIdx, $tileW, $otherEdges = 'TBLR', $otherColor = '8A8A8A') {
     $env:FOCUSSCREEN_INI = New-Ini $style $otherEdges $otherColor
     $demo = Start-Process $ahk "`"$PSScriptRoot\demo.ahk`" $focusIdx 15" -PassThru
     Start-Sleep 2
@@ -58,46 +63,50 @@ function Capture-Scene($file, $style, $focusIdx, $otherEdges = 'TBLR', $otherCol
     [Drawing.Graphics]::FromImage($bmp).CopyFromScreen($x, $y, 0, 0, $bmp.Size)
     Stop-Process -Id $fs.Id, $demo.Id -Force -ErrorAction SilentlyContinue
     Start-Sleep -Milliseconds 500
-    $bmp.Save($file, [Drawing.Imaging.ImageFormat]::Png)
-    $bmp.Dispose()
-}
 
-function Resize-Image($src, $dst, $width) {
-    $b = [Drawing.Bitmap]::FromFile($src)
-    $r = New-Object Drawing.Bitmap $width, ([int]($width * $b.Height / $b.Width))
-    $g = [Drawing.Graphics]::FromImage($r); $g.InterpolationMode = 'HighQualityBicubic'
-    $g.DrawImage($b, 0, 0, $r.Width, $r.Height)
-    $b.Dispose(); $r.Save($dst, [Drawing.Imaging.ImageFormat]::Png); $r.Dispose()
+    $rects = [Windows.Forms.Screen]::AllScreens | Sort-Object { $_.Bounds.X } | ForEach-Object { $_.Bounds }
+    $tileH = [int]($tileW * 9 / 16); $gap = 6
+    $pair = New-Object Drawing.Bitmap ($tileW * $rects.Count + $gap * ($rects.Count - 1)), $tileH
+    $g = [Drawing.Graphics]::FromImage($pair)
+    $g.Clear([Drawing.Color]::FromArgb(24, 24, 24))
+    $g.InterpolationMode = 'HighQualityBicubic'; $g.PixelOffsetMode = 'HighQuality'
+    $i = 0
+    foreach ($r in $rects) {
+        $src = New-Object Drawing.Rectangle ($r.X - $x), ($r.Y - $y), $r.Width, $r.Height
+        $dst = New-Object Drawing.Rectangle ($i * ($tileW + $gap)), 0, $tileW, $tileH
+        $g.DrawImage($bmp, $dst, $src, [Drawing.GraphicsUnit]::Pixel)
+        $i++
+    }
+    $g.Dispose(); $bmp.Dispose()
+    return $pair
 }
 
 $userRunning = [bool](Get-Process AutoHotkey64 -ErrorAction SilentlyContinue)
 Stop-Process -Name AutoHotkey64 -Force -ErrorAction SilentlyContinue
 Start-Sleep -Milliseconds 500
-$tmp = Join-Path $env:TEMP 'focusscreen-shots'
-New-Item -ItemType Directory -Force $tmp | Out-Null
 try {
     # 1. Focus on the right / left monitor (default glow)
-    Capture-Scene "$tmp\focus-right.png" 'glow' 2
-    Capture-Scene "$tmp\focus-left.png" 'glow' 1
-    Resize-Image "$tmp\focus-right.png" "$OutDir\focus-right.png" 1600
-    Resize-Image "$tmp\focus-left.png" "$OutDir\focus-left.png" 1600
+    foreach ($case in @(@('focus-right', 2), @('focus-left', 1))) {
+        $p = Capture-Pair 'glow' $case[1] 800
+        $p.Save("$OutDir\$($case[0]).png", [Drawing.Imaging.ImageFormat]::Png); $p.Dispose()
+    }
 
-    # 2. Facing edge for the other screen
-    Capture-Scene "$tmp\facing.png" 'glow' 2 'AUTO' '00B8D4'    # cyan only so the demo is easy to see
-    Resize-Image "$tmp\facing.png" "$OutDir\facing-edge.png" 1600
+    # 2. Facing edge for the other screen (cyan only so the demo is easy to see)
+    $p = Capture-Pair 'glow' 2 800 'AUTO' '00B8D4'
+    $p.Save("$OutDir\facing-edge.png", [Drawing.Imaging.ImageFormat]::Png); $p.Dispose()
 
     # 3. Style gallery (2 x 3 contact sheet)
     $styles = 'glow', 'vignette', 'border', 'double', 'dashed', 'corners'
     $labels = 'Glow (default)', 'Vignette', 'Solid', 'Double', 'Dashed', 'Corners'
-    $tw = 800
-    $sheet = $null; $i = 0
+    $sheet = $null; $g = $null; $i = 0
     foreach ($st in $styles) {
-        Capture-Scene "$tmp\s_$st.png" $st 2
-        $b = [Drawing.Bitmap]::FromFile("$tmp\s_$st.png")
-        $th = [int]($tw * $b.Height / $b.Width)
-        if (-not $sheet) { $sheet = New-Object Drawing.Bitmap ($tw * 2 + 30), (($th + 10) * 3 + 10); $g = [Drawing.Graphics]::FromImage($sheet); $g.Clear([Drawing.Color]::FromArgb(24, 24, 24)); $g.InterpolationMode = 'HighQualityBicubic' }
-        $cx = 10 + ($i % 2) * ($tw + 10); $cy = 10 + [math]::Floor($i / 2) * ($th + 10)
-        $g.DrawImage($b, $cx, $cy, $tw, $th)
+        $b = Capture-Pair $st 2 400
+        if (-not $sheet) {
+            $sheet = New-Object Drawing.Bitmap ($b.Width * 2 + 30), (($b.Height + 10) * 3 + 10)
+            $g = [Drawing.Graphics]::FromImage($sheet); $g.Clear([Drawing.Color]::FromArgb(40, 40, 40))
+        }
+        $cx = 10 + ($i % 2) * ($b.Width + 10); $cy = 10 + [math]::Floor($i / 2) * ($b.Height + 10)
+        $g.DrawImage($b, $cx, $cy, $b.Width, $b.Height)
         $g.FillRectangle((New-Object Drawing.SolidBrush ([Drawing.Color]::FromArgb(200, 0, 0, 0))), $cx, $cy, 120, 20)
         $g.DrawString($labels[$i], (New-Object Drawing.Font 'Segoe UI', 9), [Drawing.Brushes]::White, $cx + 5, $cy + 2)
         $b.Dispose(); $i++
@@ -107,7 +116,6 @@ try {
 finally {
     Stop-Process -Name AutoHotkey64 -Force -ErrorAction SilentlyContinue
     Remove-Item Env:FOCUSSCREEN_INI -ErrorAction SilentlyContinue
-    Remove-Item $tmp -Recurse -Force -ErrorAction SilentlyContinue
     if ($userRunning) { Start-Process $ahk "`"$root\FocusScreen.ahk`"" }
 }
 Write-Host "Saved to $OutDir"
