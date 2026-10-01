@@ -2,6 +2,12 @@
 #SingleInstance Force
 Persistent
 
+;@Ahk2Exe-SetName FocusScreen
+;@Ahk2Exe-SetDescription FocusScreen - multi-monitor focus indicator
+;@Ahk2Exe-SetVersion 0.1.0
+;@Ahk2Exe-SetCopyright MIT License
+VERSION := "0.1.0"        ; keep in sync with ;@Ahk2Exe-SetVersion above
+
 ; FocusScreen - marks the monitor that owns the foreground window with a thin
 ; edge indicator, and optionally marks the other monitors with a subtler one.
 ; One click-through overlay per monitor, event driven (no polling).
@@ -630,6 +636,8 @@ ToggleStartup(*) {
     lnk := A_Startup "\FocusScreen.lnk"
     if FileExist(lnk)
         FileDelete(lnk)
+    else if A_IsCompiled                 ; the exe is its own interpreter
+        FileCreateShortcut(A_ScriptFullPath, lnk, A_ScriptDir, , "FocusScreen")
     else
         FileCreateShortcut(A_AhkPath, lnk, A_ScriptDir, '"' A_ScriptFullPath '"', "FocusScreen")
     BuildTrayMenu()
@@ -639,7 +647,7 @@ ToggleStartup(*) {
 BuildTrayMenu() {
     tray := A_TrayMenu
     tray.Delete()
-    A_IconTip := "FocusScreen"
+    A_IconTip := "FocusScreen " VERSION
     tray.Add("Enabled", ToggleEnabled)
     if State.enabled
         tray.Check("Enabled")
